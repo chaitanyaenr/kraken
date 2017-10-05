@@ -10,6 +10,8 @@ import tempfile
 import requests
 #from openshift import client, config
 from kubernetes import client, config
+from colorama import init
+from colorama import Fore, Back, Style
 
 nodes = []
 master_nodes = []
@@ -18,9 +20,11 @@ config.load_kube_config()
 cli = client.CoreV1Api()
 body = client.V1DeleteOptions()
 #cli = client.OapiApi()
+init()
+print(Fore.GREEN + 'number of pods: %s') %(a)
 
 def help():
-    print "Usage: monkey --config <path-to-config-file>"
+    print (Fore.GREEN + 'Usage: monkey --config <path-to-config-file>')
 
 def list_nodes(label):
     nodes = []
@@ -34,7 +38,7 @@ def check_count(before_count, after_count):
         status = True
     else:
         status = False
-        print "looks like the pod has not been rescheduled, test failed"
+        print(Fore.RED + 'looks like the pod has not been rescheduled, test failed')
     return status
 
 ###########  check the pod status, count only the pods which are ready########
@@ -85,40 +89,40 @@ def monkey(label):
     # count number of pods before deleting the node
     pod_count_node = node_pod_count(random_node)
     pod_count_before = pod_count()
-    print "There are %s pods before deleting the node and %s pods running on the node" %(pod_count_before, pod_count_node)
+    print (Fore.YELLOW + 'There are %s pods before deleting the node and %s pods running on the node') %(pod_count_before, pod_count_node)
     # delete a node
-    print "deleting %s" %(random_node)
+    print (Fore.GREEN + 'deleting %s') %(random_node)
     cli.delete_node(random_node, body)
     #check if the node is taken out
     delete_counter = 0
     while True:
-        print "waiting for %s to get deleted" %(random_node)
+        print (Fore.YELLOW + 'waiting for %s to get deleted') %(random_node)
         time.sleep(60)
         if random_node in list_nodes():
             delete_counter = delete_counter+60
         else:
-            print "%s deleted" %(random_node)
+            print (Fore.GREEN + '%s deleted') %(random_node)
             break
         if delete_counter > 120:
-            print "something went wrong, node didn't get deleted"
+            print (Fore.RED + 'something went wrong, node did not get deleted')
             sys.exit(1)
     # pod count after deleting the node
     pod_count_after = pod_count()
     sleep_counter = 0
     # check if the pods have been rescheduled
     while True:
-        print "checking if the pods have been rescheduled"
+        print (Fore.YELLOW + 'checking if the pods have been rescheduled')
         time.sleep(60)
         status = check_count(pod_count_before, pod_count_after)
         if status:
-            print "Test passed, pods have been been rescheduled"
+            print (Fore.GREEN 'Test passed, pods have been been rescheduled')
             break
         sleep_counter = sleep_counter+60
         if sleep_counter > 900:
-            print "Test failed, looks like pods haven't been rescheduled after waiting for 900 seconds"
+            print (Fore.RED + 'Test failed, looks like pods have not been rescheduled after waiting for 900 seconds')
             sys.exit(1)
 
-def main(cfg, kube_cfg):
+def main(cfg):
     #parse config
     if os.path.isfile(cfg):
         config = ConfigParser.ConfigParser()
@@ -126,7 +130,7 @@ def main(cfg, kube_cfg):
         namespace = config.get('projects','name')
         label = config.get('projects', 'label')
         if (options.label is None):
-            print "label is not provided, assuming you are okay with deleting any of the available nodes except the master"
+            print (Fore.YELLOW + 'label is not provided, assuming you are okay with deleting any of the available nodes except the master')
             label = "undefined"
         monkey(label)
         gopath = config.get('set-env','gopath')
@@ -138,9 +142,9 @@ if __name__ == "__main__":
     parser = optparse.OptionParser()
     parser.add_option("-c", "--config", dest="cfg", help="path to the config")
     (options, args) = parser.parse_args()
-    print "Using the default config file in ~/.kube/config"
+    print (Fore.YELLOW + 'Using the default config file in ~/.kube/config')
     if (options.cfg is None):
         help()
         sys.exit(1)
     else:
-        main(options.cfg, kube_cfg )
+        main(options.cfg)
