@@ -4,3 +4,4 @@ PyYAML
 requests
 kubernetes
 openshift
+colorama
