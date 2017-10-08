@@ -1,0 +1,15 @@
+[pbench-controller]
+
+[masters]
+
+[nodes]
+
+[etcd]
+
+[lb]
+
+[glusterfs]
+
+[controller:vars]
+label_pbench=False
+

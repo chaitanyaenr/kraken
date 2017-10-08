@@ -40,8 +40,6 @@ def check_count(before_count, after_count):
         print(Fore.RED + 'looks like the pod has not been rescheduled, test failed\n')
     return status
 
-###########  check the pod status, count only the pods which are ready ########
-    
 def pod_count():
     pods = []
     pods_list = cli.list_pod_for_all_namespaces(watch=False)
@@ -51,7 +49,7 @@ def pod_count():
     return count
 
 def check_master(picked_node):
-    ret = cli.list_node(pretty=True, label_selector="type=master")
+    ret = cli.list_node(pretty=True, label_selector=master_label)
     for data in ret.items:
         master_nodes.append(data.metadata.name)
     if picked_node in master_nodes:
@@ -128,6 +126,7 @@ def main(cfg):
         config.read(cfg)
         namespace = config.get('projects','name')
         label = config.get('projects', 'label')
+        master_label = config.get('projects', 'master_label')
         if (label is None):
             print (Fore.YELLOW + 'label is not provided, assuming you are okay with deleting any of the available nodes except the master\n')
             label = "undefined"
