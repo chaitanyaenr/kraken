@@ -10,6 +10,5 @@
 
 [glusterfs]
 
-[controller:vars]
+[pbench-controller:vars]
 label_pbench=False
-
