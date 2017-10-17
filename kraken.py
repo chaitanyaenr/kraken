@@ -15,7 +15,6 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 nodes = []
-master_nodes = []
 #kube_cfg =  os.path.join(os.environ["HOME"], '.kube/config')
 config.load_kube_config()
 cli = client.CoreV1Api()
@@ -45,13 +44,17 @@ def pod_count():
         pods.append(pod.status.pod_ip)
     return len(pods)
 
-def check_master(picked_node, master_label):
+def check_master(picked_node, master_label, label):
+    master_nodes = []
     ret = cli.list_node(pretty=True, label_selector=master_label)
     for data in ret.items:
         master_nodes.append(data.metadata.name)
+    print master_nodes
     if picked_node in master_nodes:
-        picked_node = get_random_node()
-        check_master(random_node)
+        print picked_node
+        node = get_random_node(label)
+        print node
+        check_master(node, master_label, label)
     return picked_node
 
 def get_random_node(label):
@@ -97,7 +100,7 @@ def node_test(label, master_label):
     # leave master node out
     # pick random node to kill
     random_node = get_random_node(label)
-    random_node = check_master(random_node, master_label)
+    random_node = check_master(random_node, master_label, label)
     # count number of pods before deleting the node
     pod_count_node = node_pod_count(random_node)
     pod_count_before = pod_count()
@@ -124,7 +127,13 @@ def node_test(label, master_label):
             sys.exit(1)
         print (Fore.YELLOW + 'Test ended at %s UTC') %(datetime.datetime.utcnow())
 
-def get_leader(master_label):
+def get_leader(master_label, current_master):
+    random_master_node = get_random_node(master_label)
+    while True:
+      if random_master_node == current_master:
+            random_master_node = get_random_node(master_label)
+      else:
+            break
     random_master_node = get_random_node(master_label)
     url = "https://%s:2379/v2/stats/self" %(random_master_node)
     leader_info = requests.get(url, cert=('/etc/etcd/peer.crt', '/etc/etcd/peer.key'), verify=False)
@@ -142,15 +151,16 @@ def get_leader(master_label):
 
 def master_test(label, master_label):
     # pick random node to kill
-    leader_node = get_leader(master_label)
+    leader_node = get_leader(master_label, "undefined")
     print (Fore.YELLOW + '%s is the current leader\n') %(leader_node)
-    print (Fore.GREEN + 'deleting %s\n') %(leader_node)
+    print (Fore.GREEN + 'killing %s\n') %(leader_node)
     cmd = "pkill etcd"
     subprocess.Popen(["ssh", "%s" % leader_node, cmd],
                        shell=False,
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE)
-    new_leader = get_leader(master_label)
+    time.sleep(5)
+    new_leader = get_leader(master_label, leader_node)
     print (Fore.YELLOW + '%s is the newly elected master\n') %(new_leader)
     if leader_node == new_leader:
         print (Fore.RED + 'Looks like the same node got elected\n')
