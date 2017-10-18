@@ -11,8 +11,22 @@ $ pip install -r requirements.txt
 ### Node is offline or deleted
 - Kraken deletes a random node and checks if the pods running on the node are rescheduled on some other node. 
 
-### kill Master
+### Kill Master
 - Kraken takes down a master which is the current leader in a high availability environment and checks if the load balancer is still routing the requests to one of the master.
+
+### Kill etcd
+#### Possible scenarios:
+- Kill random node
+- Kill leader node
+- Kill majority of nodes in cluster
+- Kill all nodes
+- Kill node for a long time to trigger snapshot when it comes back
+- Network partition
+- Slow network
+
+#### Scenarios covered:
+- kill random node
+- kill leader node
 
 ### Label master, worker nodes
 - Master node needs to be labeled with node_type=master so that the tool doesn't delete the master which will cause problems when we don't have a high availability cluster.
@@ -40,6 +54,3 @@ $ python kraken.py --config config/config.ini
 ```
 ## Node is offline
 ![Alt text](node_offline.png)
-
-## Master is killed
-![Alt text](kill_master.png)

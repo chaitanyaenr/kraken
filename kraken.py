@@ -22,6 +22,27 @@ body = client.V1DeleteOptions()
 poll_timeout = 30
 init()
 
+def get_leader(master_label, current_master):
+    random_master_node = get_random_node(master_label)
+    while True:
+      if random_master_node == current_master:
+            random_master_node = get_random_node(master_label)
+      else:
+            break
+    random_master_node = get_random_node(master_label)
+    url = "https://%s:2379/v2/stats/self" %(random_master_node)
+    leader_info = requests.get(url, cert=('/etc/etcd/peer.crt', '/etc/etcd/peer.key'), verify=False)
+    leader_data = json.loads(leader_info.text)
+    leader_hash = leader_data['leaderInfo']['leader']
+    url = "https://%s:2379/v2/members" %(random_master_node)
+    members = requests.get(url, cert=('/etc/etcd/peer.crt', '/etc/etcd/peer.key'), verify=False)
+    members_data = json.loads(members.text)
+    members_info = members_data['members']
+    for index, value in enumerate(members_info):
+       if leader_hash in members_info[index]['id']:
+           leader_node = members_info[index]['name']
+    return leader_node
+
 def list_nodes(label):
     nodes = []
     ret = cli.list_node(pretty=True, label_selector=label)
@@ -49,11 +70,8 @@ def check_master(picked_node, master_label, label):
     ret = cli.list_node(pretty=True, label_selector=master_label)
     for data in ret.items:
         master_nodes.append(data.metadata.name)
-    print master_nodes
     if picked_node in master_nodes:
-        print picked_node
         node = get_random_node(label)
-        print node
         check_master(node, master_label, label)
     return picked_node
 
@@ -127,29 +145,8 @@ def node_test(label, master_label):
             sys.exit(1)
         print (Fore.YELLOW + 'Test ended at %s UTC') %(datetime.datetime.utcnow())
 
-def get_leader(master_label, current_master):
-    random_master_node = get_random_node(master_label)
-    while True:
-      if random_master_node == current_master:
-            random_master_node = get_random_node(master_label)
-      else:
-            break
-    random_master_node = get_random_node(master_label)
-    url = "https://%s:2379/v2/stats/self" %(random_master_node)
-    leader_info = requests.get(url, cert=('/etc/etcd/peer.crt', '/etc/etcd/peer.key'), verify=False)
-    leader_data = json.loads(leader_info.text)
-    leader_hash = leader_data['leaderInfo']['leader']
-    print leader_hash
-    url = "https://%s:2379/v2/members" %(random_master_node)
-    members = requests.get(url, cert=('/etc/etcd/peer.crt', '/etc/etcd/peer.key'), verify=False)
-    members_data = json.loads(members.text)
-    members_info = members_data['members']
-    for index, value in enumerate(members_info):
-       if leader_hash in members_info[index]['id']:
-           leader_node = members_info[index]['name']
-    return leader_node
-
-def master_test(label, master_label):
+def etcd_test(label, master_label):
+    print (Fore.YELLOW + 'Assuming that etcd and master are co-located')
     # pick random node to kill
     leader_node = get_leader(master_label, "undefined")
     print (Fore.YELLOW + '%s is the current leader\n') %(leader_node)
@@ -161,11 +158,27 @@ def master_test(label, master_label):
                        stderr=subprocess.PIPE)
     time.sleep(5)
     new_leader = get_leader(master_label, leader_node)
-    print (Fore.YELLOW + '%s is the newly elected master\n') %(new_leader)
+    print (Fore.GREEN + '%s is the newly elected leader\n') %(new_leader)
     if leader_node == new_leader:
         print (Fore.RED + 'Looks like the same node got elected\n')
-        print (Fore.RED + 'Master_test Failed\n')
+        print (Fore.RED + 'Etcd test Failed\n')
         sys.exit(1)
+    try:
+        get_random_node(master_label)
+    except:
+        print (Fore.GREEN + 'requests not processed\n')
+        sys.exit(1)
+    print (Fore.GREEN + 'Etcd test passed, the cluster is still functional%s\n') %(new_leader)
+
+def master_test(label, master_label):
+    # pick random node to kill
+    master_node = get_random(master_label)
+    print (Fore.GREEN + 'killing %s\n') %(master_node)
+    cmd = "systemctl stop atomic-openshift-master-controllers.service"
+    subprocess.Popen(["ssh", "%s" % master_node, cmd],
+                       shell=False,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE)
     ## check if the load balancer is routing the requests to the newly elected master
     print (Fore.YELLOW + 'Checking if the load balancer is routing the requests to the newly elected master')
     try:
