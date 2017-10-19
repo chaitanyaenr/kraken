@@ -20,6 +20,7 @@ config.load_kube_config()
 cli = client.CoreV1Api()
 body = client.V1DeleteOptions()
 poll_timeout = 30
+crash_poll_timeout = 500
 init()
 
 def get_leader(master_label, current_master):
@@ -113,8 +114,6 @@ def check_node(random_node, master_label):
             sys.exit(1)
 
 def node_test(label, master_label):
-    # get list of nodes
-    list_nodes(label)
     # leave master node out
     # pick random node to kill
     random_node = get_random_node(label)
@@ -122,7 +121,7 @@ def node_test(label, master_label):
     # count number of pods before deleting the node
     pod_count_node = node_pod_count(random_node)
     pod_count_before = pod_count()
-    print (Fore.YELLOW + 'There are %s pods before deleting the node and %s pods running on the node picked to be deleted from the cluster\n') %(pod_count_before, pod_count_node)
+    print (Fore.YELLOW + 'There are %s pods running on the cluster before deleting the node and %s pods running on the node picked to be deleted from the cluster\n') %(pod_count_before, pod_count_node)
     # delete a node
     print (Fore.GREEN + 'deleting %s\n') %(random_node)
     cli.delete_node(random_node, body)
@@ -132,7 +131,7 @@ def node_test(label, master_label):
     sleep_counter = 1
     # check if the pods have been rescheduled
     while True:
-        print (Fore.YELLOW + 'checking if the pods have been rescheduled\n')
+        print (Fore.YELLOW + 'Checking if the pods have been rescheduled\n')
         time.sleep(sleep_counter)
         status = check_count(pod_count_before, pod_count_after)
         if status:
@@ -170,6 +169,42 @@ def etcd_test(label, master_label):
         sys.exit(1)
     print (Fore.GREEN + 'Etcd test passed, the cluster is still functional%s\n') %(new_leader)
 
+def node_crash(label, master_label):
+    # leave master node out
+    # pick random node to kill
+    random_node = get_random_node(label)
+    random_node = check_master(random_node, master_label, label)
+    # count number of pods before deleting the node
+    pod_count_node = node_pod_count(random_node)
+    pod_count_before = pod_count()
+    print (Fore.YELLOW + 'There are %s pods running on the cluster before deleting the node and %s pods running on the node picked to be deleted from the cluster\n') %(pod_count_before, pod_count_node)
+    # delete a node
+    print (Fore.GREEN + 'crashing %s\n') %(random_node)
+    cmd = "echo "c" > /proc/sysrq-trigger"
+    subprocess.Popen(["ssh", "%s" % random_node, cmd],
+                       shell=False,
+                       stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE)
+    check_node(random_node, master_label)
+    # pod count after deleting the node
+    pod_count_after = pod_count()
+    sleep_counter = 1
+    # check if the pods have been rescheduled
+    while True:
+        print (Fore.YELLOW + 'Checking if the pods have been rescheduled\n')
+        print (Fore.YELLOW + 'It is expected to take more than 5 min for the pods to get rescheduled during a node crash, node controller waits for 5 min before terminating the pods that are bound to the unavailbel node') 
+        time.sleep(sleep_counter)
+        status = check_count(pod_count_before, pod_count_after)
+        if status:
+            print (Fore.GREEN + 'Test passed, pods have been been rescheduled. It took approximately %s seconds\n') %(sleep_counter)
+            break
+        sleep_counter = sleep_counter+10
+        if sleep_counter > crash_poll_timeout:
+            print (Fore.RED + 'Test failed, looks like pods have not been rescheduled after waiting for %s seconds\n') %(sleep_counter)
+            print (Fore.YELLOW + 'Test ended at %s UTC') %(datetime.datetime.utcnow())
+            sys.exit(1)
+        print (Fore.YELLOW + 'Test ended at %s UTC') %(datetime.datetime.utcnow())
+
 def master_test(label, master_label):
     # pick random node to kill
     master_node = get_random(master_label)
@@ -202,6 +237,8 @@ def main(cfg):
             label = "undefined"
         if test_name == "kill_node":
             node_test(label, master_label)
+        elif test_name == "crash_node":
+            node_crash(label, master_label)
         elif test_name == "kill_master":
             master_test(label, master_label)
     else:

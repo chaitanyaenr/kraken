@@ -19,13 +19,11 @@ $ pip install -r requirements.txt
 - Kill random node
 - Kill leader node
 - Kill majority of nodes in cluster
-- Kill all nodes
 - Kill node for a long time to trigger snapshot when it comes back
 - Network partition
 - Slow network
 
 #### Scenarios covered:
-- kill random node
 - kill leader node
 
 ### Label master, worker nodes
@@ -45,6 +43,7 @@ Set the master_label, label with the labels given to the master, worker nodes in
 master_label: node_type=master
 label: type=kraken
 test_type: kill_node
+test_type: crash_node
 test_type: kill_master
 ```
 
