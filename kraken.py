@@ -72,8 +72,8 @@ def check_master(picked_node, master_label, label):
     for data in ret.items:
         master_nodes.append(data.metadata.name)
     if picked_node in master_nodes:
-        node = get_random_node(label)
-        check_master(node, master_label, label)
+        picked_node = get_random_node(label)
+        check_master(picked_node, master_label, label)
     return picked_node
 
 def get_random_node(label):
@@ -150,7 +150,8 @@ def etcd_test(label, master_label):
     leader_node = get_leader(master_label, "undefined")
     print (Fore.YELLOW + '%s is the current leader\n') %(leader_node)
     print (Fore.GREEN + 'killing %s\n') %(leader_node)
-    cmd = "pkill etcd"
+    #cmd = "pkill etcd"
+    cmd = "systemctl stop etcd"
     subprocess.Popen(["ssh", "%s" % leader_node, cmd],
                        shell=False,
                        stdout=subprocess.PIPE,
@@ -167,7 +168,7 @@ def etcd_test(label, master_label):
     except:
         print (Fore.GREEN + 'requests not processed\n')
         sys.exit(1)
-    print (Fore.GREEN + 'Etcd test passed, the cluster is still functional%s\n') %(new_leader)
+    print (Fore.GREEN + 'Etcd test passed, the cluster is still functional')
 
 def node_crash(label, master_label):
     # leave master node out
@@ -180,7 +181,7 @@ def node_crash(label, master_label):
     print (Fore.YELLOW + 'There are %s pods running on the cluster before deleting the node and %s pods running on the node picked to be deleted from the cluster\n') %(pod_count_before, pod_count_node)
     # delete a node
     print (Fore.GREEN + 'crashing %s\n') %(random_node)
-    cmd = "echo "c" > /proc/sysrq-trigger"
+    cmd = "echo c > /proc/sysrq-trigger"
     subprocess.Popen(["ssh", "%s" % random_node, cmd],
                        shell=False,
                        stdout=subprocess.PIPE,
@@ -192,7 +193,7 @@ def node_crash(label, master_label):
     # check if the pods have been rescheduled
     while True:
         print (Fore.YELLOW + 'Checking if the pods have been rescheduled\n')
-        print (Fore.YELLOW + 'It is expected to take more than 5 min for the pods to get rescheduled during a node crash, node controller waits for 5 min before terminating the pods that are bound to the unavailbel node') 
+        print (Fore.YELLOW + 'It is expected to take more than 5 min for the pods to get rescheduled during a node crash, node controller waits for 5 min before terminating the pods that are bound to the unavailable node\n') 
         time.sleep(sleep_counter)
         status = check_count(pod_count_before, pod_count_after)
         if status:
@@ -207,7 +208,7 @@ def node_crash(label, master_label):
 
 def master_test(label, master_label):
     # pick random node to kill
-    master_node = get_random(master_label)
+    master_node = get_random_node(master_label)
     print (Fore.GREEN + 'killing %s\n') %(master_node)
     cmd = "systemctl stop atomic-openshift-master-controllers.service"
     subprocess.Popen(["ssh", "%s" % master_node, cmd],
@@ -215,13 +216,13 @@ def master_test(label, master_label):
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE)
     ## check if the load balancer is routing the requests to the newly elected master
-    print (Fore.YELLOW + 'Checking if the load balancer is routing the requests to the newly elected master')
+    print (Fore.YELLOW + 'Checking if the load balancer is routing the requests to the newly elected master\n')
     try:
         get_random_node(master_label)
     except:
         print (Fore.RED + 'Failed to ping apiserver, looks like the openshift cluster has not recovered after deleting the master\n')
         sys.exit(1)
-    print (Fore.GREEN + 'Master test passed, the load balancer is successfully routing the requests to %s\n') %(new_leader)
+    print (Fore.GREEN + 'Master test passed, the load balancer is successfully routing the requests\n')
 
 def main(cfg):
     #parse config
@@ -241,6 +242,11 @@ def main(cfg):
             node_crash(label, master_label)
         elif test_name == "kill_master":
             master_test(label, master_label)
+        elif test_name == "kill_etcd":
+            etcd_test(label, master_label)
+        else:
+            print (Fore.RED + '%s is not a valid scenario, please choose from kill_node, crash_node, kill_etcd, kill_master') %(test_name)
+            sys.exit(1)
     else:
         help()
         sys.exit(1)

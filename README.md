@@ -44,6 +44,7 @@ master_label: node_type=master
 label: type=kraken
 test_type: kill_node
 test_type: crash_node
+test_type : kill_etcd
 test_type: kill_master
 ```
 
@@ -52,4 +53,10 @@ test_type: kill_master
 $ python kraken.py --config config/config.ini  
 ```
 ## Node is offline
-![Alt text](node_offline.png)
+![Alt text](kill_node.png)
+
+## Etcd is killed
+![Alt text](kill_etcd.png)
+
+## Master is killed
+![Alt text](kill_master.png)

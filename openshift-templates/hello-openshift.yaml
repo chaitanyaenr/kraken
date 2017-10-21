@@ -4,7 +4,7 @@ kind: ReplicationController
 metadata:
   name: hello-openshift
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     name: hello-openshift
   template:
