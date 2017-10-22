@@ -63,7 +63,8 @@ def pod_count():
     pods = []
     pods_list = cli.list_pod_for_all_namespaces(watch=False)
     for pod in pods_list.items:
-        pods.append(pod.status.pod_ip)
+        if pod.status.phase == "Running":
+           pods.append(pod.status.pod_ip)
     return len(pods)
 
 def check_master(picked_node, master_label, label):
