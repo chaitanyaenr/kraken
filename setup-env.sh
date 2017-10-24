@@ -4,7 +4,7 @@ gopath=$1
 function help(){
 	echo "Usage: setup-env.sh <gopath>"
 }
-if [[ $gopath == "" ]]; then
+if [[ -z $gopath ]] && [[ -z $GOPATH ]]; then
 	gopath="/root/.go"
 fi
 # Install go, dependencies

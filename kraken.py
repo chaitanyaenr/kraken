@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from crontab import CronTab
 import sys, os, yaml, time, datetime, json
 import optparse
 import random
@@ -20,7 +19,7 @@ config.load_kube_config()
 cli = client.CoreV1Api()
 body = client.V1DeleteOptions()
 poll_timeout = 30
-crash_poll_timeout = 500
+crash_poll_timeout = 120
 init()
 
 def get_leader(master_label, current_master):
@@ -91,10 +90,10 @@ def get_random_node(label):
 def node_status(node):
     cmd = "oc get nodes | grep %s" %(node)
     with open("/tmp/nodes","w") as node_file:
-        subprocess.Popen(cmd, shell=True, stdout=list_pods).communicate()[0]
+        subprocess.Popen(cmd, shell=True, stdout=node_file).communicate()[0]
     for line in open('/tmp/nodes'):
-        node_status = line.split('  ')[1]
-    return node_status
+        status = line.split()[1]
+    return status
 
 def node_pod_count(node):
     cmd = "oadm manage-node %s --list-pods" %(node)
@@ -103,9 +102,6 @@ def node_pod_count(node):
     with open("/tmp/pods","r") as pods_file:
         get_pods = pods_file.readlines()[1:]
     return len(get_pods)
-
-def help():
-    print (Fore.GREEN + 'Usage: monkey --config <path-to-config-file>')
 
 def check_node(random_node, master_label):
     #check if the node is taken out
@@ -197,14 +193,16 @@ def node_crash(label, master_label):
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE)
     node_status_counter = 1
-    print (Fore.YELLOW + 'Checking if the node status is NotReady')
+    print (Fore.YELLOW + 'Waiting for the node status to change to NotReady\n')
     while True:
-        node_status = node_status(random_node)
-        if node_status != "Ready"
+        state = node_status(random_node)
+        if state != "Ready":
+            print (Fore.YELLOW + 'It took %s seconds for the node to change to NotReady state\n') %(node_status_counter)
             break
         node_status_counter = node_status_counter+1
-        if node_status_timeout > 60:
-            print (Fore.RED + 'Node crash test failed, the %s is still in running state even after 60 seconds') %(random_node)
+        time.sleep(node_status_counter)
+        if node_status_counter > crash_poll_timeout:
+            print (Fore.RED + 'Node crash test failed, the %s is still in running state even after 60 seconds\n') %(random_node)
             sys.exit(1)
     sleep_counter = 1
     # check if the pods have been rescheduled
@@ -228,7 +226,8 @@ def master_test(label, master_label):
     # pick random node to kill
     master_node = get_random_node(master_label)
     print (Fore.GREEN + 'killing %s\n') %(master_node)
-    cmd = "systemctl stop atomic-openshift-master-controllers.service"
+    #cmd = "systemctl stop atomic-openshift-master-controllers.service"
+    cmd = "systemctl stop atomic-openshift-master-apiserver.service"
     subprocess.Popen(["ssh", "%s" % master_node, cmd],
                        shell=False,
                        stdout=subprocess.PIPE,
@@ -270,7 +269,6 @@ def main(cfg):
         sys.exit(1)
 
 if __name__ == "__main__":
-    print (Fore.YELLOW + 'starting the test at %s UTC') %(datetime.datetime.utcnow())
     parser = optparse.OptionParser()
     parser.add_option("-c", "--config", dest="cfg", help="path to the config")
     (options, args) = parser.parse_args()
