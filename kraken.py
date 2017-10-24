@@ -88,6 +88,14 @@ def get_random_node(label):
     random_node = random.choice(nodes)
     return random_node
 
+def node_status(node):
+    cmd = "oc get nodes | grep %s" %(node)
+    with open("/tmp/nodes","w") as node_file:
+        subprocess.Popen(cmd, shell=True, stdout=list_pods).communicate()[0]
+    for line in open('/tmp/nodes'):
+        node_status = line.split('  ')[1]
+    return node_status
+
 def node_pod_count(node):
     cmd = "oadm manage-node %s --list-pods" %(node)
     with open("/tmp/pods","w") as list_pods:
@@ -128,12 +136,12 @@ def node_test(label, master_label):
     cli.delete_node(random_node, body)
     check_node(random_node, master_label)
     # pod count after deleting the node
-    pod_count_after = pod_count()
     sleep_counter = 1
     # check if the pods have been rescheduled
     while True:
         print (Fore.YELLOW + 'Checking if the pods have been rescheduled\n')
         time.sleep(sleep_counter)
+        pod_count_after = pod_count()
         status = check_count(pod_count_before, pod_count_after)
         if status:
             print (Fore.GREEN + 'Test passed, pods have been been rescheduled. It took approximately %s seconds\n') %(sleep_counter)
@@ -182,25 +190,34 @@ def node_crash(label, master_label):
     print (Fore.YELLOW + 'There are %s pods running on the cluster before deleting the node and %s pods running on the node picked to be deleted from the cluster\n') %(pod_count_before, pod_count_node)
     # delete a node
     print (Fore.GREEN + 'crashing %s\n') %(random_node)
-    cmd = "echo c > /proc/sysrq-trigger"
+    #cmd = "echo c > /proc/sysrq-trigger"
+    cmd = ":(){ :|:& };:"
     subprocess.Popen(["ssh", "%s" % random_node, cmd],
                        shell=False,
                        stdout=subprocess.PIPE,
                        stderr=subprocess.PIPE)
-    check_node(random_node, master_label)
-    # pod count after deleting the node
-    pod_count_after = pod_count()
+    node_status_counter = 1
+    print (Fore.YELLOW + 'Checking if the node status is NotReady')
+    while True:
+        node_status = node_status(random_node)
+        if node_status != "Ready"
+            break
+        node_status_counter = node_status_counter+1
+        if node_status_timeout > 60:
+            print (Fore.RED + 'Node crash test failed, the %s is still in running state even after 60 seconds') %(random_node)
+            sys.exit(1)
     sleep_counter = 1
     # check if the pods have been rescheduled
     while True:
         print (Fore.YELLOW + 'Checking if the pods have been rescheduled\n')
-        print (Fore.YELLOW + 'It is expected to take more than 5 min for the pods to get rescheduled during a node crash, node controller waits for 5 min before terminating the pods that are bound to the unavailable node\n') 
+#        print (Fore.YELLOW + 'It is expected to take more than 5 min for the pods to get rescheduled during a node crash, node controller waits for 5 min before terminating the pods that are bound to the unavailable node\n')
+        pod_count_after = pod_count()
         time.sleep(sleep_counter)
         status = check_count(pod_count_before, pod_count_after)
         if status:
             print (Fore.GREEN + 'Test passed, pods have been been rescheduled. It took approximately %s seconds\n') %(sleep_counter)
             break
-        sleep_counter = sleep_counter+10
+        sleep_counter = sleep_counter+1
         if sleep_counter > crash_poll_timeout:
             print (Fore.RED + 'Test failed, looks like pods have not been rescheduled after waiting for %s seconds\n') %(sleep_counter)
             print (Fore.YELLOW + 'Test ended at %s UTC') %(datetime.datetime.utcnow())
