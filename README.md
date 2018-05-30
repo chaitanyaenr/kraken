@@ -63,13 +63,13 @@ test_type: kill_master
 $ python kraken.py --config config/config.ini  
 ```
 ## Node crash
-![Alt text](images/node_crash.png)
+![Alt text](sample-runs/node_crash.png)
 
 ## Etcd is killed
-![Alt text](images/kill_etcd.png)
+![Alt text](sample-runs/kill_etcd.png)
 
 ## Node is offline
-![Alt text](images/kill_node.png)
+![Alt text](sample-runs/kill_node.png)
 
 ## Master is killed
-![Alt text](images/kill_master.png)
+![Alt text](sample-runs/kill_master.png)

@@ -274,7 +274,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
     print (Fore.YELLOW + 'Using the default config file in ~/.kube/config')
     if (options.cfg is None):
-        help()
+        print (Fore.YELLOW + 'Please check if you have passed the config')
         sys.exit(1)
     else:
         main(options.cfg)
