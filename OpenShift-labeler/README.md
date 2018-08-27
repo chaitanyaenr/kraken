@@ -1,6 +1,8 @@
+# Deprecated in favor of https://github.com/openshift/svt/tree/master/openshift_tooling/openshift_labeler
 # Openshift-labeler
 
 Playbook to label OpenShift nodes.
+
 
 ### Sample inventory
 Your inventory should have groups of hosts describing the roles they play in the OpenShift cluster. This playbook looks for the following groups in the inventory file:
